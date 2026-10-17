@@ -56,6 +56,7 @@ class AppSettings extends ChangeNotifier {
     style = OxygenStyle.values[styleIndex.clamp(0, OxygenStyle.values.length - 1).toInt()];
     brightness = OxygenBrightness.values[brightnessIndex.clamp(0, OxygenBrightness.values.length - 1).toInt()];
     accent = Color(prefs.getInt(_accentKey) ?? 0xFFB6A7FF);
+    materialMonochrome = prefs.getBool(_materialMonochromeKey) ?? false;
     animations = prefs.getBool(_animationsKey) ?? true;
     compact = prefs.getBool(_compactKey) ?? false;
     final edgeIndex = prefs.getInt(_dockEdgeKey) ?? DockEdge.left.index;
