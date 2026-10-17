@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../widgets/glass_surface.dart';
@@ -143,6 +144,7 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              if (defaultTargetPlatform != TargetPlatform.android) ...[
               const SizedBox(height: 26),
               _SectionTitle(
                 title: 'Плавающая навигация',
@@ -201,6 +203,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 26),
+              ],
               _SectionTitle(
                 title: 'Поведение',
                 subtitle: 'Настройки сохраняются автоматически.',
@@ -280,7 +283,7 @@ class SettingsScreen extends StatelessWidget {
                     child: Icon(Icons.graphic_eq_rounded, color: Theme.of(context).colorScheme.onPrimary),
                   ),
                   title: const Text('Oxygen Music', style: TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: const Text('Версия 3.5.1 · создатели и дополнительные функции'),
+                  subtitle: const Text('Версия 3.9.0 · создатели и дополнительные функции'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: onOpenAbout,
                 ),

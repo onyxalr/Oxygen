@@ -81,7 +81,7 @@ class TrackTile extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(bottom: compact ? 3 : 6),
-      child: settings.animations && !settings.reducedEffects
+      child: settings.animations
           ? AnimatedContainer(duration: const Duration(milliseconds: 120), decoration: decoration, child: tileBody)
           : Container(decoration: decoration, child: tileBody),
     );
@@ -125,7 +125,7 @@ class _Cover extends StatelessWidget {
                   track.artworkUrl!,
                   fit: BoxFit.cover,
                   cacheWidth: (size * 2).round(),
-                  errorBuilder: (_, __, ___) => Icon(Icons.music_note_rounded, color: scheme.onSurfaceVariant, size: size * .5),
+                  errorBuilder: (_, _, _) => Icon(Icons.music_note_rounded, color: scheme.onSurfaceVariant, size: size * .5),
                 ),
                 if (active)
                   DecoratedBox(

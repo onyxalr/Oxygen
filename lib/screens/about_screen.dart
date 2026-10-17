@@ -66,7 +66,7 @@ class _AboutScreenState extends State<AboutScreen> {
                     children: [
                       Text('О приложении', style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -.8)),
                       const SizedBox(height: 5),
-                      Text('Oxygen Music · версия 3.5.1', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text('Oxygen Music · версия 3.9.0', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant)),
                       if (!unlocked && _titleTaps > 0) ...[
                         const SizedBox(height: 7),
                         Text(

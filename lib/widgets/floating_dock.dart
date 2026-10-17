@@ -327,7 +327,7 @@ class _DockSurface extends StatelessWidget {
     }
 
     return AnimatedContainer(
-      duration: settings.animations && !settings.reducedEffects ? const Duration(milliseconds: 130) : Duration.zero,
+      duration: settings.animations ? const Duration(milliseconds: 130) : Duration.zero,
       decoration: BoxDecoration(borderRadius: radius, boxShadow: outerShadow),
       child: Material(color: Colors.transparent, borderRadius: radius, clipBehavior: Clip.antiAlias, child: surface),
     );

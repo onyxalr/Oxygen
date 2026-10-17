@@ -41,7 +41,7 @@ class AppSettings extends ChangeNotifier {
   bool playerVisualizer = true;
   bool waveformTimeline = true;
   String equalizerPreset = 'Ровный';
-  List<double> equalizerBands = <double>[0, 0, 0, 0, 0];
+  List<double> equalizerBands = List<double>.filled(10, 0, growable: false);
 
   ThemeMode get themeMode => switch (brightness) {
         OxygenBrightness.dark => ThemeMode.dark,
@@ -69,8 +69,11 @@ class AppSettings extends ChangeNotifier {
     waveformTimeline = prefs.getBool(_waveformKey) ?? true;
     equalizerPreset = prefs.getString(_eqPresetKey) ?? 'Ровный';
     final savedBands = prefs.getStringList(_eqBandsKey);
-    if (savedBands != null && savedBands.length == 5) {
-      equalizerBands = savedBands.map((value) => double.tryParse(value) ?? 0).map((value) => value.clamp(-8.0, 8.0).toDouble()).toList(growable: false);
+    if (savedBands != null && (savedBands.length == 5 || savedBands.length == 10)) {
+      final parsed = savedBands.map((value) => double.tryParse(value) ?? 0).toList(growable: false);
+      equalizerBands = parsed.length == 10
+          ? parsed.map((value) => value.clamp(-12.0, 12.0).toDouble()).toList(growable: false)
+          : List<double>.generate(10, (index) => parsed[index ~/ 2].clamp(-12.0, 12.0).toDouble(), growable: false);
     }
     loaded = true;
     themeRevision.value++;
@@ -171,7 +174,11 @@ class AppSettings extends ChangeNotifier {
   }
 
   Future<void> setEqualizerBands(List<double> values) async {
-    equalizerBands = values.take(5).map((value) => value.clamp(-8.0, 8.0).toDouble()).toList(growable: false);
+    equalizerBands = List<double>.generate(
+      10,
+      (index) => (index < values.length ? values[index] : 0).clamp(-12.0, 12.0).toDouble(),
+      growable: false,
+    );
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_eqBandsKey, equalizerBands.map((value) => value.toStringAsFixed(2)).toList(growable: false));

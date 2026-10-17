@@ -35,9 +35,14 @@ class GlassSurface extends StatelessWidget {
     // Only explicitly marked, small hero surfaces may sample the backdrop.
     // Keep the sigma low: high-radius blur is disproportionately expensive on
     // integrated GPUs and tends to make clipped corners look dirty.
-    final safeBlur = isGlass && blur >= 4.5
-        ? (settings.reducedEffects ? 1.0 : blur.clamp(0.0, 2.2).toDouble())
+    // Reduced-effects mode never samples the backdrop: this is substantially
+    // cheaper on older iGPUs and avoids edge halos while still keeping the tint.
+    final safeBlur = isGlass && blur >= 4.5 && !settings.reducedEffects
+        ? blur.clamp(0.0, 2.0).toDouble()
         : 0.0;
+    final transitionDuration = settings.animations
+        ? const Duration(milliseconds: 220)
+        : Duration.zero;
     final adjustedRadius = isGlass ? (radius + 3).clamp(0.0, 36.0).toDouble() : radius;
     final radiusValue = BorderRadius.circular(adjustedRadius);
 
@@ -66,7 +71,9 @@ class GlassSurface extends StatelessWidget {
     }
 
     final glassFill = base.withValues(alpha: dark ? .42 : .57);
-    final glassSurface = Container(
+    final glassSurface = AnimatedContainer(
+      duration: transitionDuration,
+      curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
         borderRadius: radiusValue,
         boxShadow: settings.reducedEffects
@@ -97,7 +104,9 @@ class GlassSurface extends StatelessWidget {
                 ),
               ),
             Positioned.fill(
-              child: DecoratedBox(
+              child: AnimatedContainer(
+                duration: transitionDuration,
+                curve: Curves.easeOutCubic,
                 decoration: BoxDecoration(
                   color: glassFill,
                   gradient: LinearGradient(
@@ -110,6 +119,7 @@ class GlassSurface extends StatelessWidget {
                     ],
                   ),
                 ),
+                child: const SizedBox.expand(),
               ),
             ),
             if (border)

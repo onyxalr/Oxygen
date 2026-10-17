@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/track.dart';
 import '../services/app_settings.dart';
 import '../services/audio_controller.dart';
+import '../services/song_catalog_service.dart';
+import '../widgets/glass_surface.dart';
 import 'lyrics_sheet.dart';
 
 /// Full player. Playback progress has its own ValueNotifier, so audio position
@@ -57,11 +59,7 @@ class FullPlayerScreen extends StatelessWidget {
                                             child: Center(
                                               child: ConstrainedBox(
                                                 constraints: const BoxConstraints(maxWidth: 440),
-                                                child: _AlbumArt(
-                                                  settings: settings,
-                                                  isPlaying: audio.isPlaying,
-                                                  track: track,
-                                                ),
+                                                child: _AnimatedAlbumArt(settings: settings, isPlaying: audio.isPlaying, track: track, audio: audio),
                                               ),
                                             ),
                                           ),
@@ -70,7 +68,13 @@ class FullPlayerScreen extends StatelessWidget {
                                             flex: 6,
                                             child: SingleChildScrollView(
                                               padding: const EdgeInsets.symmetric(vertical: 8),
-                                              child: _PlayerControls(audio: audio, settings: settings),
+                                              child: GlassSurface(
+                                                settings: settings,
+                                                radius: settings.style == OxygenStyle.materialYou ? 32 : 28,
+                                                blur: settings.style == OxygenStyle.liquidGlass && !settings.reducedEffects && constraints.maxWidth >= 850 ? 4.6 : 0,
+                                                padding: const EdgeInsets.all(24),
+                                                child: _PlayerControls(audio: audio, settings: settings),
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -90,10 +94,16 @@ class FullPlayerScreen extends StatelessWidget {
                                       children: [
                                         SizedBox(
                                           width: artSide,
-                                          child: _AlbumArt(settings: settings, isPlaying: audio.isPlaying, track: track),
+                                          child: _AnimatedAlbumArt(settings: settings, isPlaying: audio.isPlaying, track: track, audio: audio),
                                         ),
-                                        const SizedBox(height: 26),
-                                        _PlayerControls(audio: audio, settings: settings),
+                                        const SizedBox(height: 22),
+                                        GlassSurface(
+                                          settings: settings,
+                                          radius: settings.style == OxygenStyle.materialYou ? 32 : 28,
+                                          blur: settings.style == OxygenStyle.liquidGlass && !settings.reducedEffects && constraints.maxWidth >= 850 ? 4.6 : 0,
+                                          padding: const EdgeInsets.all(20),
+                                          child: _PlayerControls(audio: audio, settings: settings),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -102,7 +112,16 @@ class FullPlayerScreen extends StatelessWidget {
                             },
                           ),
                         ),
-                        _VolumeStrip(audio: audio),
+                        _VolumeStrip(audio: audio, settings: settings),
+                        if (audio.busy && audio.statusMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2)),
+                              const SizedBox(width: 9),
+                              Flexible(child: Text(audio.statusMessage!, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall)),
+                            ]),
+                          ),
                         if (audio.lastError != null)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
@@ -111,6 +130,28 @@ class FullPlayerScreen extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: scheme.error),
+                            ),
+                          ),
+                        if (audio.lastError != null && audio.current != null && audio.state == OxygenPlaybackState.stopped)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                FilledButton.tonalIcon(
+                                  onPressed: audio.playCurrent,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Повторить'),
+                                ),
+                                if (!audio.current!.isRemote)
+                                  OutlinedButton.icon(
+                                    onPressed: audio.locateCurrentAudioFile,
+                                    icon: const Icon(Icons.folder_open_rounded),
+                                    label: const Text('Найти файл заново'),
+                                  ),
+                              ],
                             ),
                           ),
                       ],
@@ -131,25 +172,35 @@ class _PlayerBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    if (settings.style == OxygenStyle.oxygen) {
-      return ColoredBox(color: Theme.of(context).scaffoldBackgroundColor);
-    }
-    return DecoratedBox(
+    final glass = settings.style == OxygenStyle.liquidGlass;
+    final material = settings.style == OxygenStyle.materialYou;
+    final stops = glass
+        ? <Color>[
+            settings.accent.withValues(alpha: settings.reducedEffects ? .09 : .18),
+            const Color(0xFF182333),
+            Theme.of(context).scaffoldBackgroundColor,
+          ]
+        : material
+            ? <Color>[
+                scheme.primaryContainer.withValues(alpha: .44),
+                scheme.surface,
+                Theme.of(context).scaffoldBackgroundColor,
+              ]
+            : <Color>[
+                Theme.of(context).scaffoldBackgroundColor,
+                Theme.of(context).scaffoldBackgroundColor,
+                Theme.of(context).scaffoldBackgroundColor,
+              ];
+    return AnimatedContainer(
+      duration: settings.animations ? const Duration(milliseconds: 420) : Duration.zero,
+      curve: Curves.easeInOutCubic,
       decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         gradient: RadialGradient(
-          center: const Alignment(-.72, -.88),
-          radius: 1.25,
-          colors: settings.style == OxygenStyle.liquidGlass
-              ? [
-                  settings.accent.withValues(alpha: settings.reducedEffects ? .11 : .20),
-                  Theme.of(context).scaffoldBackgroundColor,
-                  const Color(0xFF111B2B),
-                ]
-              : [
-                  scheme.primaryContainer.withValues(alpha: .55),
-                  Theme.of(context).scaffoldBackgroundColor,
-                  Theme.of(context).scaffoldBackgroundColor,
-                ],
+          center: const Alignment(-.76, -.92),
+          radius: 1.35,
+          stops: const [0.0, 0.52, 1.0],
+          colors: stops,
         ),
       ),
     );
@@ -164,98 +215,138 @@ class _PlayerHeader extends StatelessWidget {
   void _showLyrics(BuildContext context) {
     final track = audio.current;
     if (track == null) return;
-    final liquid = settings.style == OxygenStyle.liquidGlass;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: liquid ? Colors.transparent : Theme.of(context).colorScheme.surface,
-      builder: (_) => LyricsSheet(settings: settings, track: track),
+      backgroundColor: settings.style == OxygenStyle.liquidGlass ? Colors.transparent : Theme.of(context).colorScheme.surface,
+      builder: (_) => LyricsSheet(settings: settings, track: track, audio: audio),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final track = audio.current;
+    final material = settings.style == OxygenStyle.materialYou;
+    final liquid = settings.style == OxygenStyle.liquidGlass;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
-      child: Row(
-        children: [
-          IconButton.filledTonal(
-            onPressed: () => Navigator.of(context).maybePop(),
-            tooltip: 'Свернуть плеер',
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          ),
-          const Spacer(),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'СЕЙЧАС ИГРАЕТ',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      letterSpacing: 1.7,
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                settings.style == OxygenStyle.materialYou ? 'Oxygen · Player' : 'Из твоей библиотеки',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-          const Spacer(),
-          if (audio.current?.storeUrl != null)
-            IconButton(
-              tooltip: 'Открыть в Apple Music',
-              onPressed: () async {
-                final url = audio.current?.storeUrl;
-                if (url != null) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-              },
-              icon: const Icon(Icons.open_in_new_rounded),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      child: GlassSurface(
+        settings: settings,
+        radius: material ? 28 : liquid ? 26 : 18,
+        blur: liquid && !settings.reducedEffects ? 4.6 : 0,
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        child: Row(
+          children: [
+            IconButton.filledTonal(
+              onPressed: () => Navigator.of(context).maybePop(),
+              tooltip: 'Свернуть плеер',
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
             ),
-          IconButton(
-            tooltip: 'Текст песни',
-            onPressed: () => _showLyrics(context),
-            icon: const Icon(Icons.lyrics_outlined),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Вид и режимы',
-            onSelected: (value) {
-              switch (value) {
-                case 'shuffle':
-                  audio.toggleShuffle();
-                  break;
-                case 'repeat':
-                  audio.toggleRepeatOne();
-                  break;
-                case 'visualizer':
-                  settings.setPlayerVisualizer(!settings.playerVisualizer);
-                  break;
-                case 'wave':
-                  settings.setWaveformTimeline(!settings.waveformTimeline);
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              CheckedPopupMenuItem<String>(value: 'shuffle', checked: audio.shuffle, child: const Text('Перемешивание')),
-              CheckedPopupMenuItem<String>(value: 'repeat', checked: audio.repeatOne, child: const Text('Повтор трека')),
-              CheckedPopupMenuItem<String>(value: 'visualizer', checked: settings.playerVisualizer, child: const Text('Индикатор воспроизведения')),
-              CheckedPopupMenuItem<String>(value: 'wave', checked: settings.waveformTimeline, child: const Text('Волнистая шкала')),
-            ],
-            icon: const Icon(Icons.more_horiz_rounded),
-          ),
-        ],
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'СЕЙЧАС ИГРАЕТ',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 1.5, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(audio.isPlaying ? Icons.graphic_eq_rounded : Icons.music_note_rounded, size: 14, color: scheme.primary),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          'Воспроизведение',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (track?.storeUrl != null)
+              IconButton(
+                tooltip: 'Открыть страницу трека',
+                onPressed: () async {
+                  final raw = audio.current?.storeUrl;
+                  final url = raw == null ? null : Uri.tryParse(raw);
+                  if (url != null) await launchUrl(url, mode: LaunchMode.externalApplication);
+                },
+                icon: const Icon(Icons.open_in_new_rounded),
+              ),
+            IconButton(tooltip: 'Текст песни', onPressed: () => _showLyrics(context), icon: const Icon(Icons.lyrics_outlined)),
+            PopupMenuButton<String>(
+              tooltip: 'Вид и режимы',
+              onSelected: (value) {
+                switch (value) {
+                  case 'shuffle': audio.toggleShuffle(); break;
+                  case 'repeat': audio.toggleRepeatOne(); break;
+                  case 'visualizer': settings.setPlayerVisualizer(!settings.playerVisualizer); break;
+                  case 'wave': settings.setWaveformTimeline(!settings.waveformTimeline); break;
+                }
+              },
+              itemBuilder: (context) => [
+                CheckedPopupMenuItem<String>(value: 'shuffle', checked: audio.shuffle, child: const Text('Перемешивание')),
+                CheckedPopupMenuItem<String>(value: 'repeat', checked: audio.repeatOne, child: const Text('Повтор трека')),
+                CheckedPopupMenuItem<String>(value: 'visualizer', checked: settings.playerVisualizer, child: const Text('Индикатор воспроизведения')),
+                CheckedPopupMenuItem<String>(value: 'wave', checked: settings.waveformTimeline, child: const Text('Волнистая шкала')),
+              ],
+              icon: const Icon(Icons.more_horiz_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedAlbumArt extends StatelessWidget {
+  const _AnimatedAlbumArt({required this.settings, required this.isPlaying, required this.track, required this.audio});
+  final AppSettings settings;
+  final bool isPlaying;
+  final Track track;
+  final AudioController audio;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = settings.animations
+        ? const Duration(milliseconds: 260)
+        : Duration.zero;
+    return AnimatedScale(
+      scale: isPlaying && settings.animations ? 1.012 : 1.0,
+      duration: settings.animations ? const Duration(milliseconds: 420) : Duration.zero,
+      curve: Curves.easeOutCubic,
+      child: AnimatedSwitcher(
+        duration: duration,
+        reverseDuration: duration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(scale: Tween<double>(begin: .965, end: 1).animate(animation), child: child),
+        ),
+        child: _AlbumArt(key: ValueKey<String>(track.id), settings: settings, isPlaying: isPlaying, track: track, audio: audio),
       ),
     );
   }
 }
 
 class _AlbumArt extends StatelessWidget {
-  const _AlbumArt({required this.settings, required this.isPlaying, required this.track});
+  const _AlbumArt({super.key, required this.settings, required this.isPlaying, required this.track, required this.audio});
   final AppSettings settings;
   final bool isPlaying;
   final Track track;
+  final AudioController audio;
 
   @override
   Widget build(BuildContext context) {
@@ -297,25 +388,9 @@ class _AlbumArt extends StatelessWidget {
                           track.artworkUrl!,
                           fit: BoxFit.cover,
                           cacheWidth: (side * 2).round(),
-                          errorBuilder: (_, __, ___) => ColoredBox(color: scheme.surfaceContainerHighest, child: Icon(Icons.album_rounded, size: side * .45, color: scheme.onSurfaceVariant)),
+                          errorBuilder: (_, _, _) => ColoredBox(color: scheme.surfaceContainerHighest, child: Icon(Icons.album_rounded, size: side * .45, color: scheme.onSurfaceVariant)),
                         ),
                       ),
-                      if (track.isRemote)
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          bottom: 12,
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(color: Colors.black.withValues(alpha: .62), borderRadius: BorderRadius.circular(14)),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                child: Text('iTunes Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                              ),
-                            ),
-                          ),
-                        ),
                     ] else if (material) ...[
                       Positioned(
                         right: side * .10,
@@ -409,15 +484,17 @@ class _AlbumArt extends StatelessWidget {
                       ),
                     ] else ...[
                       Center(child: Icon(Icons.graphic_eq_rounded, size: side * .46, color: scheme.surface)),
-                      Positioned(left: side * .12, bottom: side * .11, child: Text('OXYGEN / LOCAL PLAYER', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.surface, letterSpacing: 1.3))),
                     ],
+                    if (track.artworkUrl == null)
+                      Positioned.fill(child: _ArtworkResolver(track: track)),
                     if (settings.playerVisualizer && isPlaying)
                       Positioned(
                         right: 18,
                         bottom: 18,
-                        child: settings.animations && !settings.reducedEffects
-                            ? const _PlayingIndicator()
-                            : Icon(Icons.equalizer_rounded, color: material ? scheme.onPrimaryContainer : Colors.white.withValues(alpha: .9), size: 28),
+                        child: _PlayingIndicator(
+                          audio: audio,
+                          color: material ? scheme.onPrimaryContainer : Colors.white.withValues(alpha: .96),
+                        ),
                       ),
                   ],
                 );
@@ -430,57 +507,130 @@ class _AlbumArt extends StatelessWidget {
   }
 }
 
-class _PlayingIndicator extends StatefulWidget {
-  const _PlayingIndicator();
+class _ArtworkResolver extends StatefulWidget {
+  const _ArtworkResolver({required this.track});
+  final Track track;
+
   @override
-  State<_PlayingIndicator> createState() => _PlayingIndicatorState();
+  State<_ArtworkResolver> createState() => _ArtworkResolverState();
 }
 
-class _PlayingIndicatorState extends State<_PlayingIndicator> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 950),
-  )..repeat(reverse: true);
+class _ArtworkResolverState extends State<_ArtworkResolver> {
+  late Future<String?> _future;
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _future = SongCatalogService.lookupArtwork(widget.track);
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 32,
-        height: 28,
-        child: CustomPaint(painter: _BarsPainter(_controller, Colors.white)),
-      );
-}
-
-class _BarsPainter extends CustomPainter {
-  _BarsPainter(this.animation, this.color) : super(repaint: animation);
-  final Animation<double> animation;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    const count = 4;
-    final barWidth = 4.0;
-    final gap = (size.width - count * barWidth) / (count * 2 - 2);
-    for (var i = 0; i < count; i++) {
-      final phase = animation.value * math.pi * 2 + i * .92;
-      final h = 7 + 17 * ((math.sin(phase) + 1) / 2);
-      final left = i * (barWidth + gap * 2);
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(left, size.height - h, barWidth, h),
-        const Radius.circular(3),
-      );
-      canvas.drawRRect(rect, paint);
+  void didUpdateWidget(covariant _ArtworkResolver oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track.id != widget.track.id) {
+      _future = SongCatalogService.lookupArtwork(widget.track);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _BarsPainter oldDelegate) => color != oldDelegate.color;
+  Widget build(BuildContext context) => FutureBuilder<String?>(
+        future: _future,
+        builder: (context, snapshot) {
+          final url = snapshot.data;
+          if (url == null || url.isEmpty) return const SizedBox.expand();
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+            child: Image.network(
+              url,
+              key: ValueKey<String>(url),
+              fit: BoxFit.cover,
+              cacheWidth: 900,
+              errorBuilder: (_, _, _) => const SizedBox.expand(),
+            ),
+          );
+        },
+      );
+}
+
+class _PlayingIndicator extends StatefulWidget {
+  const _PlayingIndicator({required this.audio, required this.color});
+  final AudioController audio;
+  final Color color;
+
+  @override
+  State<_PlayingIndicator> createState() => _PlayingIndicatorState();
+}
+
+class _PlayingIndicatorState extends State<_PlayingIndicator> {
+  @override
+  void initState() {
+    super.initState();
+    widget.audio.setVisualizerEnabled(true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlayingIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.audio != widget.audio) {
+      oldWidget.audio.setVisualizerEnabled(false);
+      widget.audio.setVisualizerEnabled(true);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.audio.setVisualizerEnabled(false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<List<double>>(
+        valueListenable: widget.audio.visualizerBands,
+        builder: (context, bands, _) => SizedBox(
+          width: 48,
+          height: 34,
+          child: CustomPaint(painter: _SpectrumPainter(bands, widget.color)),
+        ),
+      );
+}
+
+class _SpectrumPainter extends CustomPainter {
+  const _SpectrumPainter(this.bands, this.color);
+  final List<double> bands;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return;
+    }
+    final count = bands.length.clamp(4, 10);
+    final barWidth = (size.width / (count * 1.85)).clamp(2.0, 4.0).toDouble();
+    final gap = (size.width - count * barWidth) / (count - 1);
+    final paint = Paint()..color = color..strokeCap = StrokeCap.round;
+    for (var i = 0; i < count; i++) {
+      final raw = i < bands.length ? bands[i] : .04;
+      final amplitude = raw.clamp(0.0, 1.0).toDouble();
+      final barHeight = 5.0 + amplitude * (size.height - 6.0);
+      final x = i * (barWidth + gap) + barWidth / 2;
+      canvas.drawLine(Offset(x, size.height), Offset(x, size.height - barHeight), paint..strokeWidth = barWidth);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpectrumPainter oldDelegate) {
+    if (oldDelegate.color != color || oldDelegate.bands.length != bands.length) {
+      return true;
+    }
+    for (var index = 0; index < bands.length; index++) {
+      if (oldDelegate.bands[index] != bands[index]) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 class _PlayerControls extends StatelessWidget {
@@ -498,7 +648,9 @@ class _PlayerControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final track = audio.current;
-    if (track == null) return const SizedBox.shrink();
+    if (track == null) {
+      return const SizedBox.shrink();
+    }
     final scheme = Theme.of(context).colorScheme;
     final material = settings.style == OxygenStyle.materialYou;
 
@@ -506,29 +658,45 @@ class _PlayerControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 3),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -.7,
-                        ),
+              child: AnimatedSwitcher(
+                duration: settings.animations ? const Duration(milliseconds: 260) : Duration.zero,
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, .04), end: Offset.zero).animate(animation),
+                    child: child,
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
+                ),
+                child: Column(
+                  key: ValueKey<String>(track.id),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -.8,
+                            height: 1.02,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      track.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -549,9 +717,16 @@ class _PlayerControls extends StatelessWidget {
           builder: (context, constraints) {
             final showJumpButtons = constraints.maxWidth >= 420;
             final compactControls = constraints.maxWidth < 360;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+            return Container(
+              padding: EdgeInsets.symmetric(horizontal: compactControls ? 2 : 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: settings.style == OxygenStyle.liquidGlass ? .18 : .48),
+                borderRadius: BorderRadius.circular(settings.style == OxygenStyle.materialYou ? 28 : 22),
+                border: Border.all(color: scheme.outlineVariant.withValues(alpha: .32)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                 IconButton(
                   visualDensity: compactControls ? VisualDensity.compact : VisualDensity.standard,
                   onPressed: audio.toggleShuffle,
@@ -593,7 +768,8 @@ class _PlayerControls extends StatelessWidget {
                   color: audio.repeatOne ? scheme.primary : scheme.onSurfaceVariant,
                   icon: const Icon(Icons.repeat_one_rounded),
                 ),
-              ],
+                ],
+              ),
             );
           },
         ),
@@ -603,11 +779,13 @@ class _PlayerControls extends StatelessWidget {
           runSpacing: 8,
           children: [
             _PlayerActionChip(
+              settings: settings,
               icon: Icons.queue_music_rounded,
               label: 'Очередь · ${audio.queue.length}',
               onPressed: () => _showQueue(context),
             ),
             _PlayerActionChip(
+              settings: settings,
               icon: Icons.equalizer_rounded,
               label: 'Эквалайзер',
               onPressed: () => _showEqualizer(context),
@@ -622,7 +800,7 @@ class _PlayerControls extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         Text(
-          'Локальное воспроизведение · ${audio.queue.isEmpty ? 0 : audio.queue.length} треков в очереди',
+          '${audio.queue.isEmpty ? 0 : audio.queue.length} треков в очереди · ${audio.isPlaying ? 'воспроизводится' : audio.state == OxygenPlaybackState.paused ? 'на паузе' : 'готов к воспроизведению'}',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
@@ -689,107 +867,197 @@ class _PlayerControls extends StatelessWidget {
 
   void _showEqualizer(BuildContext context) {
     const profiles = <String, List<double>>{
-      'Ровный': [0, 0, 0, 0, 0],
-      'Бас': [6, 4, 1, 0, -1],
-      'Рок': [4, 2, -1, 3, 5],
-      'Вокал': [-2, 0, 4, 3, 1],
-      'Электро': [4, 2, 0, 3, 4],
+      'Ровный': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      'Бас': [5, 5, 4, 3, 1, 0, 0, -1, -1, -2],
+      'Рок': [4, 3, 2, 0, -1, 1, 3, 4, 4, 3],
+      'Вокал': [-3, -2, -1, 2, 4, 4, 3, 2, 1, 0],
+      'Электро': [4, 3, 1, 0, -1, 1, 3, 4, 3, 2],
+      'Классика': [3, 2, 1, 0, -1, -1, 0, 2, 3, 4],
+      'Джаз': [4, 2, 1, 2, -1, -1, 0, 1, 3, 4],
+      'Подкаст': [-4, -2, 1, 3, 4, 4, 2, 0, -1, -2],
     };
     final bands = List<double>.from(settings.equalizerBands);
+    while (bands.length < 10) { bands.add(0); }
     var selectedProfile = profiles.containsKey(settings.equalizerPreset) ? settings.equalizerPreset : 'Пользовательский';
-    const labels = <String>['60 Hz', '250 Hz', '1 kHz', '4 kHz', '16 kHz'];
+    var eqEnabled = audio.equalizerEnabled;
+    var limiter = audio.limiterEnabled;
+    var reverb = audio.reverbEnabled;
+    var reverbMix = audio.reverbMix;
+    var spatial = audio.spatializerEnabled;
+    var spatialWidth = audio.spatializerWidth;
+    var mono = audio.monoDownmix;
+    var preamp = audio.preampDb;
+    var rate = audio.playbackRate;
+    var pitch = audio.pitch;
+    const labels = <String>['31 Hz', '63 Hz', '125 Hz', '250 Hz', '500 Hz', '1 kHz', '2 kHz', '4 kHz', '8 kHz', '16 kHz'];
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: settings.style == OxygenStyle.liquidGlass ? Colors.transparent : null,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 18 + MediaQuery.viewInsetsOf(context).bottom),
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Эквалайзер', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Профили хранятся в Oxygen. В текущей сборке они пока не меняют сам звуковой сигнал: для настоящего эквалайзера нужен DSP-аудиомодуль.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.35),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final entry in profiles.entries)
-                        ChoiceChip(
-                          label: Text(entry.key),
-                          selected: selectedProfile == entry.key,
-                          onSelected: (selected) async {
-                            if (!selected) return;
-                            setSheetState(() {
-                              selectedProfile = entry.key;
-                              for (var i = 0; i < bands.length; i++) {
-                                bands[i] = entry.value[i];
-                              }
-                            });
-                            await settings.setEqualizerPreset(entry.key);
-                            await settings.setEqualizerBands(bands);
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  for (var i = 0; i < labels.length; i++)
-                    Row(
-                      children: [
-                        SizedBox(width: 58, child: Text(labels[i], style: Theme.of(context).textTheme.labelMedium)),
-                        Expanded(
-                          child: Slider(
-                            min: -8,
-                            max: 8,
-                            divisions: 32,
-                            value: bands[i].clamp(-8.0, 8.0).toDouble(),
-                            label: '${bands[i].toStringAsFixed(1)} dB',
-                            onChanged: (value) => setSheetState(() {
-                              bands[i] = value;
-                              selectedProfile = 'Пользовательский';
-                            }),
-                            onChangeEnd: (_) async {
-                              await settings.setEqualizerPreset(selectedProfile);
-                              await settings.setEqualizerBands(bands);
-                            },
-                          ),
-                        ),
-                        SizedBox(width: 42, child: Text('${bands[i] > 0 ? '+' : ''}${bands[i].toStringAsFixed(1)}', textAlign: TextAlign.end)),
-                      ],
-                    ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.tonalIcon(
-                      onPressed: () async {
-                        setSheetState(() {
-                          for (var i = 0; i < bands.length; i++) {
-                            bands[i] = 0;
-                          }
-                          selectedProfile = 'Ровный';
-                        });
+              child: GlassSurface(
+                settings: settings,
+                radius: settings.style == OxygenStyle.liquidGlass ? 28 : 24,
+                blur: settings.style == OxygenStyle.liquidGlass && !settings.reducedEffects ? 4.6 : 0,
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(child: Text('Звук и эквалайзер', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))),
+                      IconButton(tooltip: 'Сбросить всё', onPressed: () async {
+                        const flat = <double>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                        setSheetState(() { for (var i = 0; i < 10; i++) { bands[i] = 0; } selectedProfile = 'Ровный'; preamp = 0; rate = 1; pitch = 1; });
+                        await audio.setEqualizerBands(flat);
                         await settings.setEqualizerPreset('Ровный');
-                        await settings.setEqualizerBands(bands);
-                      },
-                      icon: const Icon(Icons.restart_alt_rounded),
-                      label: const Text('Сбросить'),
+                        await settings.setEqualizerBands(flat);
+                        await audio.setPreamp(0);
+                        await audio.setPlaybackRate(1);
+                        await audio.setPitch(1);
+                      }, icon: const Icon(Icons.restart_alt_rounded)),
+                    ]),
+                    Text('Нативная обработка аудио: EQ, лимитер, реверберация и расширение стерео.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 14),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Эквалайзер'),
+                      subtitle: const Text('10 полос · −12…+12 дБ'),
+                      value: eqEnabled,
+                      onChanged: (value) async { setSheetState(() => eqEnabled = value); await audio.setEqualizerEnabled(value); },
                     ),
-                  ),
-                ],
+                    AnimatedOpacity(
+                      opacity: eqEnabled ? 1 : .42,
+                      duration: settings.animations ? const Duration(milliseconds: 160) : Duration.zero,
+                      child: IgnorePointer(
+                        ignoring: !eqEnabled,
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          SizedBox(
+                            height: 88,
+                            width: double.infinity,
+                            child: CustomPaint(painter: _EqualizerCurvePainter(values: bands, color: Theme.of(context).colorScheme.primary, gridColor: Theme.of(context).dividerColor)),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 7,
+                            runSpacing: 7,
+                            children: [
+                              for (final entry in profiles.entries)
+                                ChoiceChip(
+                                  label: Text(entry.key),
+                                  selected: selectedProfile == entry.key,
+                                  onSelected: (selected) async {
+                                    if (!selected) {
+                                      return;
+                                    }
+                                    setSheetState(() { selectedProfile = entry.key; for (var i = 0; i < 10; i++) { bands[i] = entry.value[i]; } });
+                                    await audio.setEqualizerBands(bands);
+                                    await settings.setEqualizerPreset(entry.key);
+                                    await settings.setEqualizerBands(bands);
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          for (var i = 0; i < labels.length; i++)
+                            Row(children: [
+                              SizedBox(width: 58, child: Text(labels[i], style: Theme.of(context).textTheme.labelMedium)),
+                              Expanded(child: Slider(
+                                min: -12, max: 12, divisions: 48,
+                                value: bands[i].clamp(-12.0, 12.0).toDouble(),
+                                label: '${bands[i].toStringAsFixed(1)} dB',
+                                onChanged: (value) { setSheetState(() { bands[i] = value; selectedProfile = 'Пользовательский'; }); audio.previewEqualizerBands(bands); },
+                                onChangeEnd: (_) async { await audio.setEqualizerBands(bands); await settings.setEqualizerPreset(selectedProfile); await settings.setEqualizerBands(bands); },
+                              )),
+                              SizedBox(width: 46, child: Text('${bands[i] > 0 ? '+' : ''}${bands[i].toStringAsFixed(1)} dB', textAlign: TextAlign.end, style: Theme.of(context).textTheme.labelSmall)),
+                            ]),
+                        ]),
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    Text('Обработка', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    SwitchListTile.adaptive(contentPadding: EdgeInsets.zero, title: const Text('Лимитер'), subtitle: const Text('Уменьшает резкие пики громкости'), value: limiter, onChanged: (value) async { setSheetState(() => limiter = value); await audio.setLimiterEnabled(value); }),
+                    SwitchListTile.adaptive(contentPadding: EdgeInsets.zero, title: const Text('Комнатная реверберация'), value: reverb, onChanged: (value) async { setSheetState(() => reverb = value); await audio.setReverb(enabled: value, mix: reverbMix); }),
+                    if (reverb) ...[
+                      Row(children: [const SizedBox(width: 76, child: Text('Влажность')), Expanded(child: Slider(min: 0, max: .55, divisions: 22, value: reverbMix.clamp(0.0, .55).toDouble(), label: '${(reverbMix * 100).round()}%', onChanged: (v) => setSheetState(() => reverbMix = v), onChangeEnd: (v) => audio.setReverb(enabled: true, mix: v))), Text('${(reverbMix * 100).round()}%')]),
+                    ],
+                    SwitchListTile.adaptive(contentPadding: EdgeInsets.zero, title: const Text('Широкое стерео'), value: spatial, onChanged: (value) async { setSheetState(() => spatial = value); await audio.setSpatializer(enabled: value, width: spatialWidth); }),
+                    if (spatial) ...[
+                      Row(children: [const SizedBox(width: 76, child: Text('Ширина')), Expanded(child: Slider(min: 1, max: 1.8, divisions: 16, value: spatialWidth.clamp(1.0, 1.8).toDouble(), label: spatialWidth.toStringAsFixed(2), onChanged: (v) => setSheetState(() => spatialWidth = v), onChangeEnd: (v) => audio.setSpatializer(enabled: true, width: v))), Text(spatialWidth.toStringAsFixed(2))]),
+                    ],
+                    SwitchListTile.adaptive(contentPadding: EdgeInsets.zero, title: const Text('Моно'), subtitle: const Text('Смешать левый и правый каналы'), value: mono, onChanged: (value) async { setSheetState(() => mono = value); await audio.setMonoDownmix(value); }),
+                    Row(children: [const SizedBox(width: 82, child: Text('Preamp')), Expanded(child: Slider(min: -6, max: 6, divisions: 48, value: preamp.clamp(-6.0, 6.0).toDouble(), label: '${preamp.toStringAsFixed(1)} dB', onChanged: (v) => setSheetState(() => preamp = v), onChangeEnd: audio.setPreamp)), SizedBox(width: 44, child: Text('${preamp.toStringAsFixed(1)} dB'))]),
+                    const Divider(height: 24),
+                    Text('Воспроизведение', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Row(children: [const SizedBox(width: 82, child: Text('Скорость')), Expanded(child: Slider(min: .5, max: 2, divisions: 30, value: rate.clamp(.5, 2.0).toDouble(), label: '${rate.toStringAsFixed(2)}×', onChanged: (v) => setSheetState(() => rate = v), onChangeEnd: audio.setPlaybackRate)), SizedBox(width: 50, child: Text('${rate.toStringAsFixed(2)}×'))]),
+                    Row(children: [const SizedBox(width: 82, child: Text('Высота тона')), Expanded(child: Slider(min: .5, max: 2, divisions: 30, value: pitch.clamp(.5, 2.0).toDouble(), label: '${pitch.toStringAsFixed(2)}×', onChanged: (v) => setSheetState(() => pitch = v), onChangeEnd: audio.setPitch)), SizedBox(width: 50, child: Text('${pitch.toStringAsFixed(2)}×'))]),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+}
+
+
+class _EqualizerCurvePainter extends CustomPainter {
+  const _EqualizerCurvePainter({required this.values, required this.color, required this.gridColor});
+  final List<double> values;
+  final Color color;
+  final Color gridColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return;
+    }
+    final grid = Paint()..color = gridColor.withValues(alpha: .45)..strokeWidth = 1;
+    for (var i = 0; i <= 4; i++) {
+      final y = size.height * i / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    final points = <Offset>[];
+    for (var i = 0; i < 10; i++) {
+      final x = size.width * i / 9;
+      final db = (i < values.length ? values[i] : 0).clamp(-12.0, 12.0).toDouble();
+      final y = size.height * (1 - (db + 12) / 24);
+      points.add(Offset(x, y));
+    }
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 1; i < points.length; i++) {
+      final previous = points[i - 1];
+      final current = points[i];
+      final midX = (previous.dx + current.dx) / 2;
+      path.quadraticBezierTo(previous.dx + (midX - previous.dx) * .65, previous.dy, midX, (previous.dy + current.dy) / 2);
+      path.quadraticBezierTo(midX + (current.dx - midX) * .35, current.dy, current.dx, current.dy);
+    }
+    final glow = Paint()..color = color.withValues(alpha: .08)..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+    final line = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, glow);
+    canvas.drawPath(path, line);
+    for (final point in points) {
+      canvas.drawCircle(point, 2.2, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EqualizerCurvePainter oldDelegate) {
+    if (oldDelegate.color != color || oldDelegate.gridColor != gridColor || oldDelegate.values.length != values.length) {
+      return true;
+    }
+    for (var i = 0; i < values.length; i++) { if (oldDelegate.values[i] != values[i]) return true; }
+    return false;
   }
 }
 
@@ -813,13 +1081,15 @@ class _PlaybackTimelineState extends State<_PlaybackTimeline> {
     } catch (_) {
       // The UI remains responsive when the backend cannot seek a source.
     } finally {
-      if (mounted) setState(() => _dragValue = null);
+      if (mounted) {
+        setState(() => _dragValue = null);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final useWave = widget.settings.style == OxygenStyle.materialYou && widget.settings.waveformTimeline;
+    final useWave = widget.settings.waveformTimeline;
     return ValueListenableBuilder<PlaybackProgress>(
       valueListenable: widget.audio.playbackProgress,
       builder: (context, playback, _) {
@@ -888,7 +1158,9 @@ class _WaveTimelinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 0) return;
+    if (size.width <= 0) {
+      return;
+    }
     final center = size.height / 2;
     final path = Path()..moveTo(0, center);
     // Fewer line segments produce the same visual impression with less work
@@ -918,18 +1190,30 @@ class _WaveTimelinePainter extends CustomPainter {
 }
 
 class _PlayerActionChip extends StatelessWidget {
-  const _PlayerActionChip({required this.icon, required this.label, required this.onPressed});
+  const _PlayerActionChip({required this.settings, required this.icon, required this.label, required this.onPressed});
+  final AppSettings settings;
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => ActionChip(
-        avatar: Icon(icon, size: 18),
-        label: Text(label),
-        onPressed: onPressed,
-        visualDensity: VisualDensity.compact,
-      );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final material = settings.style == OxygenStyle.materialYou;
+    final liquid = settings.style == OxygenStyle.liquidGlass;
+    return ActionChip(
+      avatar: Icon(icon, size: 18, color: scheme.primary),
+      label: Text(label),
+      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      backgroundColor: scheme.surfaceContainerHigh.withValues(alpha: liquid ? .34 : material ? .90 : .60),
+      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: liquid ? .40 : .55)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(material ? 18 : liquid ? 18 : 13)),
+      elevation: 0,
+      pressElevation: settings.reducedEffects ? 0 : 1.5,
+    );
+  }
 }
 
 class _SleepTimerButton extends StatelessWidget {
@@ -957,7 +1241,9 @@ class _BalanceButton extends StatelessWidget {
   final AudioController audio;
 
   String _label(double value) {
-    if (value.abs() < .01) return 'Баланс';
+    if (value.abs() < .01) {
+      return 'Баланс';
+    }
     return value < 0 ? 'L ${(-value * 100).round()}%' : 'R ${(value * 100).round()}%';
   }
 
@@ -981,8 +1267,9 @@ class _BalanceButton extends StatelessWidget {
 }
 
 class _VolumeStrip extends StatelessWidget {
-  const _VolumeStrip({required this.audio});
+  const _VolumeStrip({required this.audio, required this.settings});
   final AudioController audio;
+  final AppSettings settings;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -990,16 +1277,22 @@ class _VolumeStrip extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 740),
-            child: ValueListenableBuilder<double>(
-              valueListenable: audio.volumeListenable,
-              builder: (context, volume, _) => Row(
-                children: [
-                  Icon(Icons.volume_down_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
-                  Expanded(child: Slider(value: volume, onChanged: audio.setVolume)),
-                  Icon(Icons.volume_up_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
-                  const SizedBox(width: 8),
-                  SizedBox(width: 38, child: Text('${(volume * 100).round()}%', textAlign: TextAlign.end, style: Theme.of(context).textTheme.labelMedium)),
-                ],
+            child: GlassSurface(
+              settings: settings,
+              radius: settings.style == OxygenStyle.materialYou ? 24 : 19,
+              blur: settings.style == OxygenStyle.liquidGlass && !settings.reducedEffects ? 4.6 : 0,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+              child: ValueListenableBuilder<double>(
+                valueListenable: audio.volumeListenable,
+                builder: (context, volume, _) => Row(
+                  children: [
+                    Icon(Icons.volume_down_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
+                    Expanded(child: Slider(value: volume, onChanged: audio.setVolume)),
+                    Icon(Icons.volume_up_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
+                    const SizedBox(width: 8),
+                    SizedBox(width: 38, child: Text('${(volume * 100).round()}%', textAlign: TextAlign.end, style: Theme.of(context).textTheme.labelMedium)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1015,16 +1308,21 @@ class _PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 56.0 : materialYou ? 70.0 : 66.0;
+    final size = compact ? 58.0 : materialYou ? 76.0 : 72.0;
     return SizedBox(
       width: size,
       height: size,
       child: FilledButton(
         onPressed: audio.togglePlay,
         style: FilledButton.styleFrom(shape: const CircleBorder(), padding: EdgeInsets.zero),
-        child: Icon(
-          audio.busy ? Icons.hourglass_top_rounded : audio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          size: 36,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 170),
+          transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
+          child: Icon(
+            audio.busy ? Icons.hourglass_top_rounded : audio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            key: ValueKey<String>(audio.busy ? 'busy' : audio.isPlaying ? 'pause' : 'play'),
+            size: 36,
+          ),
         ),
       ),
     );
