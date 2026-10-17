@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -292,14 +290,12 @@ class _PlayerHeader extends StatelessWidget {
                   case 'shuffle': audio.toggleShuffle(); break;
                   case 'repeat': audio.toggleRepeatOne(); break;
                   case 'visualizer': settings.setPlayerVisualizer(!settings.playerVisualizer); break;
-                  case 'wave': settings.setWaveformTimeline(!settings.waveformTimeline); break;
                 }
               },
               itemBuilder: (context) => [
                 CheckedPopupMenuItem<String>(value: 'shuffle', checked: audio.shuffle, child: const Text('Перемешивание')),
                 CheckedPopupMenuItem<String>(value: 'repeat', checked: audio.repeatOne, child: const Text('Повтор трека')),
                 CheckedPopupMenuItem<String>(value: 'visualizer', checked: settings.playerVisualizer, child: const Text('Индикатор воспроизведения')),
-                CheckedPopupMenuItem<String>(value: 'wave', checked: settings.waveformTimeline, child: const Text('Волнистая шкала')),
               ],
               icon: const Icon(Icons.more_horiz_rounded),
             ),
@@ -353,7 +349,7 @@ class _AlbumArt extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final material = settings.style == OxygenStyle.materialYou;
     final glass = settings.style == OxygenStyle.liquidGlass;
-    final radius = material ? 34.0 : glass ? 30.0 : 20.0;
+    final radius = material ? 28.0 : glass ? 24.0 : 12.0;
 
     return RepaintBoundary(
       child: AspectRatio(
@@ -711,65 +707,55 @@ class _PlayerControls extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _PlaybackTimeline(audio: audio, settings: settings, formatTime: _time),
+        _PlaybackTimeline(audio: audio, formatTime: _time),
         const SizedBox(height: 18),
         LayoutBuilder(
           builder: (context, constraints) {
-            final showJumpButtons = constraints.maxWidth >= 420;
-            final compactControls = constraints.maxWidth < 360;
-            return Container(
-              padding: EdgeInsets.symmetric(horizontal: compactControls ? 2 : 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: settings.style == OxygenStyle.liquidGlass ? .18 : .48),
-                borderRadius: BorderRadius.circular(settings.style == OxygenStyle.materialYou ? 28 : 22),
-                border: Border.all(color: scheme.outlineVariant.withValues(alpha: .32)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+            final compactControls = constraints.maxWidth < 390;
+            final side = compactControls ? 40.0 : 46.0;
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 IconButton(
-                  visualDensity: compactControls ? VisualDensity.compact : VisualDensity.standard,
+                  constraints: BoxConstraints.tightFor(width: side, height: side),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: audio.toggleShuffle,
                   tooltip: 'Перемешивание',
                   color: audio.shuffle ? scheme.primary : scheme.onSurfaceVariant,
-                  icon: const Icon(Icons.shuffle_rounded),
+                  icon: const Icon(Icons.shuffle_rounded, size: 20),
                 ),
+                SizedBox(width: compactControls ? 0 : 4),
                 IconButton(
-                  visualDensity: compactControls ? VisualDensity.compact : VisualDensity.standard,
+                  constraints: BoxConstraints.tightFor(width: side, height: side),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: audio.previous,
                   tooltip: 'Предыдущий трек',
-                  icon: const Icon(Icons.skip_previous_rounded, size: 32),
+                  icon: const Icon(Icons.skip_previous_rounded, size: 29),
                 ),
-                if (showJumpButtons)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => audio.seek(audio.position - const Duration(seconds: 10)),
-                    tooltip: 'Назад на 10 секунд',
-                    icon: const Icon(Icons.replay_10_rounded, size: 25),
-                  ),
+                SizedBox(width: compactControls ? 2 : 8),
                 _PlayButton(audio: audio, materialYou: material, compact: compactControls),
-                if (showJumpButtons)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => audio.seek(audio.position + const Duration(seconds: 10)),
-                    tooltip: 'Вперёд на 10 секунд',
-                    icon: const Icon(Icons.forward_10_rounded, size: 25),
-                  ),
+                SizedBox(width: compactControls ? 2 : 8),
                 IconButton(
-                  visualDensity: compactControls ? VisualDensity.compact : VisualDensity.standard,
+                  constraints: BoxConstraints.tightFor(width: side, height: side),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: audio.next,
                   tooltip: 'Следующий трек',
-                  icon: const Icon(Icons.skip_next_rounded, size: 32),
+                  icon: const Icon(Icons.skip_next_rounded, size: 29),
                 ),
+                SizedBox(width: compactControls ? 0 : 4),
                 IconButton(
-                  visualDensity: compactControls ? VisualDensity.compact : VisualDensity.standard,
+                  constraints: BoxConstraints.tightFor(width: side, height: side),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
                   onPressed: audio.toggleRepeatOne,
                   tooltip: 'Повтор одного трека',
                   color: audio.repeatOne ? scheme.primary : scheme.onSurfaceVariant,
-                  icon: const Icon(Icons.repeat_one_rounded),
+                  icon: const Icon(Icons.repeat_one_rounded, size: 20),
                 ),
-                ],
-              ),
+              ],
             );
           },
         ),
@@ -778,6 +764,18 @@ class _PlayerControls extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
+            _PlayerActionChip(
+              settings: settings,
+              icon: Icons.replay_10_rounded,
+              label: '−10 сек',
+              onPressed: () { audio.seek(audio.position - const Duration(seconds: 10)); },
+            ),
+            _PlayerActionChip(
+              settings: settings,
+              icon: Icons.forward_10_rounded,
+              label: '+10 сек',
+              onPressed: () { audio.seek(audio.position + const Duration(seconds: 10)); },
+            ),
             _PlayerActionChip(
               settings: settings,
               icon: Icons.queue_music_rounded,
@@ -1062,9 +1060,8 @@ class _EqualizerCurvePainter extends CustomPainter {
 }
 
 class _PlaybackTimeline extends StatefulWidget {
-  const _PlaybackTimeline({required this.audio, required this.settings, required this.formatTime});
+  const _PlaybackTimeline({required this.audio, required this.formatTime});
   final AudioController audio;
-  final AppSettings settings;
   final String Function(Duration) formatTime;
 
   @override
@@ -1075,118 +1072,74 @@ class _PlaybackTimelineState extends State<_PlaybackTimeline> {
   double? _dragValue;
 
   Future<void> _commitSeek(double value, Duration duration) async {
-    final target = Duration(milliseconds: (duration.inMilliseconds * value.clamp(0.0, 1.0)).round());
+    if (duration.inMilliseconds <= 0) {
+      if (mounted) setState(() => _dragValue = null);
+      return;
+    }
+    final target = Duration(
+      milliseconds: (duration.inMilliseconds * value.clamp(0.0, 1.0)).round(),
+    );
     try {
       await widget.audio.seek(target);
     } catch (_) {
-      // The UI remains responsive when the backend cannot seek a source.
+      // Keep the controls responsive if the source cannot seek.
     } finally {
-      if (mounted) {
-        setState(() => _dragValue = null);
-      }
+      if (mounted) setState(() => _dragValue = null);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final useWave = widget.settings.waveformTimeline;
-    return ValueListenableBuilder<PlaybackProgress>(
-      valueListenable: widget.audio.playbackProgress,
-      builder: (context, playback, _) {
-        final value = (_dragValue ?? playback.value).clamp(0.0, 1.0).toDouble();
-        final scheme = Theme.of(context).colorScheme;
-        return Column(
-          children: [
-            if (useWave)
-              LayoutBuilder(
-                builder: (context, constraints) => GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapUp: (details) => _commitSeek(
-                    constraints.maxWidth <= 0 ? 0 : details.localPosition.dx / constraints.maxWidth,
-                    playback.duration,
-                  ),
-                  onHorizontalDragStart: (details) => setState(() {
-                    _dragValue = constraints.maxWidth <= 0 ? 0 : (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0).toDouble();
-                  }),
-                  onHorizontalDragUpdate: (details) => setState(() {
-                    _dragValue = constraints.maxWidth <= 0 ? 0 : (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0).toDouble();
-                  }),
-                  onHorizontalDragEnd: (_) => _commitSeek(_dragValue ?? value, playback.duration),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 34,
-                    child: CustomPaint(
-                      painter: _WaveTimelinePainter(
-                        progress: value,
-                        played: scheme.primary,
-                        unplayed: scheme.onSurfaceVariant.withValues(alpha: .30),
-                      ),
-                    ),
-                  ),
+  Widget build(BuildContext context) => ValueListenableBuilder<PlaybackProgress>(
+        valueListenable: widget.audio.playbackProgress,
+        builder: (context, playback, _) {
+          final value = (_dragValue ?? playback.value).clamp(0.0, 1.0).toDouble();
+          final scheme = Theme.of(context).colorScheme;
+          final canSeek = playback.duration.inMilliseconds > 0;
+          final shownPosition = _dragValue == null
+              ? playback.position
+              : Duration(milliseconds: (playback.duration.inMilliseconds * _dragValue!).round());
+
+          return Column(
+            children: [
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 4,
+                  activeTrackColor: scheme.primary,
+                  inactiveTrackColor: scheme.onSurfaceVariant.withValues(alpha: .24),
+                  thumbColor: scheme.primary,
+                  overlayColor: scheme.primary.withValues(alpha: .12),
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                  trackShape: const RoundedRectSliderTrackShape(),
                 ),
-              )
-            else
-              Slider(
-                value: value,
-                min: 0,
-                max: 1,
-                onChanged: (next) => setState(() => _dragValue = next),
-                onChangeEnd: (next) => _commitSeek(next, playback.duration),
+                child: Slider(
+                  value: value,
+                  min: 0,
+                  max: 1,
+                  onChanged: canSeek ? (next) => setState(() => _dragValue = next) : null,
+                  onChangeEnd: canSeek ? (next) => _commitSeek(next, playback.duration) : null,
+                ),
               ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(widget.formatTime(_dragValue == null ? playback.position : Duration(milliseconds: (playback.duration.inMilliseconds * _dragValue!).round())), style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-                  Text(widget.formatTime(playback.duration), style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-                ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      widget.formatTime(shownPosition),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                    Text(
+                      widget.formatTime(playback.duration),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _WaveTimelinePainter extends CustomPainter {
-  const _WaveTimelinePainter({required this.progress, required this.played, required this.unplayed});
-  final double progress;
-  final Color played;
-  final Color unplayed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width <= 0) {
-      return;
-    }
-    final center = size.height / 2;
-    final path = Path()..moveTo(0, center);
-    // Fewer line segments produce the same visual impression with less work
-    // on each throttled playback-progress tick.
-    const segments = 52;
-    for (var i = 1; i <= segments; i++) {
-      final x = size.width * i / segments;
-      final y = center + math.sin((x / size.width) * math.pi * 16) * 3.1;
-      path.lineTo(x, y);
-    }
-    final basePaint = Paint()..color = unplayed..style = PaintingStyle.stroke..strokeWidth = 2.2..strokeCap = StrokeCap.round;
-    final activePaint = Paint()..color = played..style = PaintingStyle.stroke..strokeWidth = 2.8..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, basePaint);
-    final activeWidth = (size.width * progress.clamp(0.0, 1.0)).toDouble();
-    canvas.save();
-    canvas.clipRect(Rect.fromLTWH(0, 0, activeWidth, size.height));
-    canvas.drawPath(path, activePaint);
-    canvas.restore();
-    final head = Offset(activeWidth, center);
-    canvas.drawCircle(head, 5, Paint()..color = played);
-    canvas.drawCircle(head, 2, Paint()..color = Colors.white.withValues(alpha: .92));
-  }
-
-  @override
-  bool shouldRepaint(covariant _WaveTimelinePainter oldDelegate) =>
-      progress != oldDelegate.progress || played != oldDelegate.played || unplayed != oldDelegate.unplayed;
+            ],
+          );
+        },
+      );
 }
 
 class _PlayerActionChip extends StatelessWidget {
@@ -1308,7 +1261,7 @@ class _PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 58.0 : materialYou ? 76.0 : 72.0;
+    final size = compact ? 54.0 : materialYou ? 72.0 : 68.0;
     return SizedBox(
       width: size,
       height: size,

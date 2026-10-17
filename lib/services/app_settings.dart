@@ -13,6 +13,7 @@ class AppSettings extends ChangeNotifier {
   static const _styleKey = 'oxygen.style';
   static const _brightnessKey = 'oxygen.brightness';
   static const _accentKey = 'oxygen.accent';
+  static const _materialMonochromeKey = 'oxygen.materialYou.monochrome';
   static const _animationsKey = 'oxygen.animations';
   static const _compactKey = 'oxygen.compact';
   static const _dockEdgeKey = 'oxygen.dock.edge';
@@ -22,13 +23,13 @@ class AppSettings extends ChangeNotifier {
   static const _reducedEffectsKey = 'oxygen.reducedEffects';
   static const _experimentalKey = 'oxygen.experimental.unlocked';
   static const _visualizerKey = 'oxygen.player.visualizer';
-  static const _waveformKey = 'oxygen.player.waveform';
   static const _eqPresetKey = 'oxygen.player.eqPreset';
   static const _eqBandsKey = 'oxygen.player.eqBands';
 
   OxygenStyle style = OxygenStyle.oxygen;
   OxygenBrightness brightness = OxygenBrightness.dark;
   Color accent = const Color(0xFFB6A7FF);
+  bool materialMonochrome = false;
   bool animations = true;
   bool compact = false;
   bool loaded = false;
@@ -39,7 +40,6 @@ class AppSettings extends ChangeNotifier {
   bool reducedEffects = true;
   bool experimentalFeaturesUnlocked = false;
   bool playerVisualizer = true;
-  bool waveformTimeline = true;
   String equalizerPreset = 'Ровный';
   List<double> equalizerBands = List<double>.filled(10, 0, growable: false);
 
@@ -56,6 +56,7 @@ class AppSettings extends ChangeNotifier {
     style = OxygenStyle.values[styleIndex.clamp(0, OxygenStyle.values.length - 1).toInt()];
     brightness = OxygenBrightness.values[brightnessIndex.clamp(0, OxygenBrightness.values.length - 1).toInt()];
     accent = Color(prefs.getInt(_accentKey) ?? 0xFFB6A7FF);
+    materialMonochrome = prefs.getBool(_materialMonochromeKey) ?? false;
     animations = prefs.getBool(_animationsKey) ?? true;
     compact = prefs.getBool(_compactKey) ?? false;
     final edgeIndex = prefs.getInt(_dockEdgeKey) ?? DockEdge.left.index;
@@ -66,7 +67,6 @@ class AppSettings extends ChangeNotifier {
     reducedEffects = prefs.getBool(_reducedEffectsKey) ?? true;
     experimentalFeaturesUnlocked = prefs.getBool(_experimentalKey) ?? false;
     playerVisualizer = prefs.getBool(_visualizerKey) ?? true;
-    waveformTimeline = prefs.getBool(_waveformKey) ?? true;
     equalizerPreset = prefs.getString(_eqPresetKey) ?? 'Ровный';
     final savedBands = prefs.getStringList(_eqBandsKey);
     if (savedBands != null && (savedBands.length == 5 || savedBands.length == 10)) {
@@ -103,6 +103,14 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final p = await SharedPreferences.getInstance();
     await p.setInt(_accentKey, value.toARGB32());
+  }
+
+  Future<void> setMaterialMonochrome(bool value) async {
+    materialMonochrome = value;
+    themeRevision.value++;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_materialMonochromeKey, value);
   }
 
   Future<void> setAnimations(bool value) async {
@@ -157,13 +165,6 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_visualizerKey, value);
-  }
-
-  Future<void> setWaveformTimeline(bool value) async {
-    waveformTimeline = value;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_waveformKey, value);
   }
 
   Future<void> setEqualizerPreset(String value) async {

@@ -24,6 +24,10 @@ class SettingsScreen extends StatelessWidget {
         animation: settings,
         builder: (context, _) {
           final isMaterialYou = settings.style == OxygenStyle.materialYou;
+          final dark = Theme.of(context).brightness == Brightness.dark;
+          final displayedAccent = isMaterialYou && settings.materialMonochrome
+              ? (dark ? const Color(0xFFE6E6E6) : const Color(0xFF242424))
+              : settings.accent;
           return ListView(
             padding: const EdgeInsets.fromLTRB(26, 22, 26, 34),
             children: [
@@ -84,11 +88,11 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               _SectionTitle(
-                title: isMaterialYou ? 'Цветовая палитра Pixel' : 'Акцентный цвет',
+                title: isMaterialYou ? (settings.materialMonochrome ? 'Монохромная палитра Pixel' : 'Цветовая палитра Pixel') : 'Акцентный цвет',
                 subtitle: settings.style == OxygenStyle.oxygen
                     ? 'Влияет на второстепенные состояния и индикаторы.'
                     : isMaterialYou
-                        ? 'Основной цвет формирует тон всей палитры Material You.'
+                        ? (settings.materialMonochrome ? 'Чёрный, белый и оттенки серого без цветных акцентов.' : 'Основной цвет формирует тон всей палитры Material You.')
                         : 'Акцент подсвечивает элементы стеклянного интерфейса.',
               ),
               const SizedBox(height: 14),
@@ -106,12 +110,12 @@ class SettingsScreen extends StatelessWidget {
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
-                            color: settings.accent,
+                            color: displayedAccent,
                             borderRadius: BorderRadius.circular(settings.style == OxygenStyle.materialYou ? 17 : 14),
                           ),
                           child: Icon(
                             Icons.palette_outlined,
-                            color: settings.accent.computeLuminance() > .55 ? Colors.black : Colors.white,
+                            color: displayedAccent.computeLuminance() > .55 ? Colors.black : Colors.white,
                           ),
                         ),
                         const SizedBox(width: 13),
@@ -119,16 +123,16 @@ class SettingsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Текущий оттенок', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                              Text(settings.materialMonochrome && isMaterialYou ? 'Монохром включён' : 'Текущий оттенок', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                               const SizedBox(height: 3),
-                              Text(_hex(settings.accent), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                              Text(settings.materialMonochrome && isMaterialYou ? 'Акцент сохранён для цветового режима' : _hex(settings.accent), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 18),
-                    Wrap(
+                    if (!isMaterialYou || !settings.materialMonochrome) Wrap(
                       spacing: 12,
                       runSpacing: 12,
                       children: _colors
@@ -141,6 +145,18 @@ class SettingsScreen extends StatelessWidget {
                           )
                           .toList(growable: false),
                     ),
+                    if (isMaterialYou) ...[
+                      const SizedBox(height: 18),
+                      const Divider(height: 1),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: settings.materialMonochrome,
+                        onChanged: settings.setMaterialMonochrome,
+                        title: const Text('Монохром Material You'),
+                        subtitle: const Text('Чёрный, белый и оттенки серого во всём интерфейсе.'),
+                        secondary: const Icon(Icons.filter_b_and_w_rounded),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -330,9 +346,15 @@ class _StylePreviewCard extends StatelessWidget {
     final Color previewBase = isOxygen
         ? (dark ? const Color(0xFF111214) : const Color(0xFFF5F5F3))
         : isMaterialYou
-            ? (dark ? const Color(0xFF20212B) : const Color(0xFFF0EAF8))
+            ? (settings.materialMonochrome
+                ? (dark ? const Color(0xFF202020) : const Color(0xFFF0F0F0))
+                : (dark ? const Color(0xFF20212B) : const Color(0xFFF0EAF8)))
             : (dark ? const Color(0xFF111B2B) : const Color(0xFFD9E5F2));
-    final Color previewAccent = isOxygen ? (dark ? Colors.white : const Color(0xFF222222)) : (isMaterialYou ? settings.accent : const Color(0xFF9DD7FF));
+    final Color previewAccent = isOxygen
+        ? (dark ? Colors.white : const Color(0xFF222222))
+        : isMaterialYou
+            ? (settings.materialMonochrome ? (dark ? const Color(0xFFEAEAEA) : const Color(0xFF252525)) : settings.accent)
+            : const Color(0xFF9DD7FF);
 
     return Material(
       color: Colors.transparent,

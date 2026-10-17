@@ -31,7 +31,6 @@ jobs:
 
      
       - name: Generate Android platform files
-        working-directory: ${{ steps.project.outputs.dir }}
         run: flutter create --platforms=android .
 
       - name: Get dependencies
