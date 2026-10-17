@@ -61,11 +61,13 @@ class _OxygenAppState extends State<OxygenApp> {
             brightness: Brightness.light,
             style: settings.style,
             accent: settings.accent,
+            materialMonochrome: settings.materialMonochrome,
           ),
           darkTheme: OxygenTheme.build(
             brightness: Brightness.dark,
             style: settings.style,
             accent: settings.accent,
+            materialMonochrome: settings.materialMonochrome,
           ),
           themeMode: settings.themeMode,
           home: OxygenShell(settings: settings, audio: audio),
@@ -409,6 +411,8 @@ class _MiniPlayer extends StatelessWidget {
           final track = audio.current;
           if (track == null) return const SizedBox(height: 7);
           final liquid = settings.style == OxygenStyle.liquidGlass;
+          final materialMonochrome = settings.style == OxygenStyle.materialYou && settings.materialMonochrome;
+          final dark = Theme.of(context).brightness == Brightness.dark;
           final radius = settings.style == OxygenStyle.materialYou ? 27.0 : (liquid ? 22.0 : 15.0);
           return Padding(
             padding: const EdgeInsets.fromLTRB(12, 5, 12, 7),
@@ -429,11 +433,18 @@ class _MiniPlayer extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [settings.accent, settings.accent.withValues(alpha: .24)],
+                          colors: materialMonochrome
+                              ? (dark
+                                  ? [const Color(0xFFE6E6E6), const Color(0xFF444444)]
+                                  : [const Color(0xFF292929), const Color(0xFFBDBDBD)])
+                              : [settings.accent, settings.accent.withValues(alpha: .24)],
                         ),
                         borderRadius: BorderRadius.circular(settings.style == OxygenStyle.materialYou ? 16 : 12),
                       ),
-                      child: Icon(Icons.graphic_eq_rounded, color: settings.accent.computeLuminance() > .55 ? Colors.black : Colors.white),
+                      child: Icon(
+                        Icons.graphic_eq_rounded,
+                        color: materialMonochrome ? (dark ? Colors.black : Colors.white) : (settings.accent.computeLuminance() > .55 ? Colors.black : Colors.white),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
